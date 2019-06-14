@@ -1,0 +1,115 @@
+﻿@model  FivestarAuto.Models.InventoryModel
+
+@using (Html.BeginForm("SaveRecord", "Home", FormMethod.Post, new { id = "form-recordEdit", @class = "full-form" }))
+{
+    <table>
+        <tr>
+            <td>@Html.LabelFor(m => m.StockNumber)</td>
+            <td>@Html.TextBoxFor(m => m.StockNumber, new { @readonly = "true" })</td>
+        </tr>
+        <tr>
+            <td> @Html.LabelFor(m => m.Make)</td>
+            <td>
+                @Html.DropDownListFor(m => m.Make, new SelectList(ViewBag.VehicleMakes, "Value", "Text"))
+            </td>
+        </tr>
+        <tr>
+            <td>@Html.LabelFor(m => m.Model)</td>
+            <td>
+                @Html.DropDownListFor(m => m.Model, new SelectList(string.Empty, "Value", "Text"), "Please select a Model", new { style = "width:250px", @class = "dropdown1" })
+            </td>
+        </tr>
+        <tr>
+            <td>@Html.LabelFor(m => m.Year)</td>
+            <td>@Html.TextBoxFor(m => m.Year)</td>
+        </tr>
+        <tr>
+            <td>@Html.LabelFor(m => m.QuantityInStock)</td>
+            <td>@Html.TextBoxFor(m => m.QuantityInStock)</td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                @Html.Label("Features")
+
+            </td>
+        </tr>
+        @foreach (FivestarAuto.Data.FeatureRecord.FeatureType t in Enum.GetValues(typeof(FivestarAuto.Data.FeatureRecord.FeatureType)))
+        {
+            <tr>
+                <td>
+                    @Html.Label("FeatureType", t.ToString())
+                </td>
+                <td>
+                    @Html.DropDownList("Feature", (ViewBag.Features as IEnumerable<SelectListItem>).Where(m => m.Value.EndsWith("|" + t.ToString())), "-Select an option-", "Text")
+                </td>
+            </tr>
+        }
+    </table>
+    
+   
+    <br />
+   
+    <br />
+    
+    
+    <div style="text-align:right;">
+        <button type="submit" id="inventoryedit-submit" name="inventoryedit-submit" value="Save" class="btn btn-primary" style="margin-left:5px;">Save</button>
+        <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
+    </div>
+
+    <script type="text/javascript">
+
+        $(document).ready(function () {
+        $("#Model").empty();
+            $.ajax({
+                type: 'POST',
+                url: '@Url.Action("LoadModels")', // we are calling json method
+
+                dataType: 'json',
+
+                data: { make: $("#Make").val() },
+
+                success: function (models) {
+                    // states contains the JSON formatted list
+                    // of states passed from the controller
+
+                    $.each(models, function (i, mod) {
+                    $("#Model").append('<option value="' + mod.Value + '">' +
+                         mod.Text + '</option>');
+
+                    });
+                },
+                error: function (ex) {
+                    alert('Failed to retrieve models.' + ex);
+                }
+            });
+        //Dropdownlist Selectedchange event
+        $("#Make").change(function () {
+            $("#Model").empty();
+            $.ajax({
+                type: 'POST',
+                url: '@Url.Action("LoadModels")', // we are calling json method
+
+                dataType: 'json',
+
+                data: { make: $("#Make").val() },
+
+                success: function (models) {
+                    // states contains the JSON formatted list
+                    // of states passed from the controller
+
+                    $.each(models, function (i, mod) {
+                    $("#Model").append('<option value="' + mod.Value + '">' +
+                         mod.Text + '</option>');
+
+                    });
+                },
+                error: function (ex) {
+                    alert('Failed to retrieve models.' + ex);
+                }
+            });
+            return false;
+        })
+    });
+    </script>
+}

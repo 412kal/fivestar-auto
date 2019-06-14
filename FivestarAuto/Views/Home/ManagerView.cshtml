@@ -1,0 +1,159 @@
+﻿@{
+    ViewBag.Title = "Inventory Management - Manager";
+    ViewBag.Markup = 0.05;
+}
+<h2>@ViewBag.Title</h2>
+<h3>@ViewBag.Message</h3>
+<a href="#soldoutModal" data-toggle="modal" data-target="#managerModal"><span class="glyphicon glyphicon-info-sign"></span></a>
+<div>
+    <button type="button" class="btn btn-info btn-lg" data-toggle="modal" data-target="#inventoryModal" onclick="editRow('')">Add Inventory</button>
+</div>
+
+<div id="inventoryModal" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+            </div>
+            <div class="modal-body">
+                <div id="recordModalBody"></div>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="managerModal" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    Depending on client needs regarding authentication/security, additional functionality, etc., this could be
+                    built either as a separate user/manager page and module, or as a customized version of the owner screen. 
+                    By comparing against the authenticated user, I could hide or show columns, filter rows, and choose which
+                    action buttons display.
+                </p>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="inventoryGrid"></div>
+
+@section scripts{
+    <link type="text/css" rel="stylesheet" href="~/Content/jsgrid.min.css" />
+    <link type="text/css" rel="stylesheet" href="~/Content/jsgrid-theme.min.css" />
+    <style type="text/css">
+        .row-sold-out {
+            background-color: darkgrey;
+            color: #770707;
+        }
+
+        .row-hide {
+            background-color: darkgrey;
+            color: #770707;
+            display: none;
+        }
+    </style>
+
+    <script type="text/javascript" src="~/Scripts/jsgrid.min.js"></script>
+    <script type="text/javascript">
+
+
+    $("#inventoryGrid").jsGrid({
+            autoload: true,
+            width: "100%",
+            sorting: true,
+            controller: {
+                loadData: function() {
+                    var d = $.Deferred();
+
+                   return $.ajax({
+                        type: "GET",
+                        url: '@Url.Action("GetInventory", "Home")',
+                       dataType: "json",
+                       success: function (data) {
+                           $("#inventoryGrid").jsGrid("sort", 1);
+                       }
+                    });
+
+                }
+            },
+            rowClass: function (item, itemIndex) {
+                var showSoldout = false;
+                var quantity = item.QuantityInStock;
+                if (quantity == 0) {
+                    return showSoldout ? "row-sold-out" : "row-sold-out row-hide";
+                }
+
+                return "";
+            },
+            fields: [
+                { name: 'StockNumber', type: 'text', title: "Stock #", sorting: true },
+                {
+                    name: 'Make', type: 'text', title: "Make", sorting: true
+                },
+                { name: 'Model', type: 'text', title: "Model", sorting: true, sorter: "string" },
+                { name: 'Year', type: 'text', title: "Year", sorting: true },
+                { name: 'TypeText', type: 'text', title: "Type", sorting: true },
+                { name: 'FeaturesText', type: 'text', title: "Features", sorting: false },
+                {
+                    name: 'RetailPrice', type: 'number', title: "RetailPrice",
+                    itemTemplate: function PriceFormatter(value, item) {
+                        return formatNumberForDisplay(value);
+                    }, sorting: true
+                },
+                { name: 'QuantityInStock', type: 'number', title:'In Stock'},
+                {
+                    type: "control", width: 100, editButton: false, deleteButton: false,
+                    itemTemplate: function (value, item) {
+                        var $result = jsGrid.fields.control.prototype.itemTemplate.apply(this, arguments);
+
+                        var $customEditButton = $("<button>").attr({
+                            class: "customGridEditbutton jsgrid-button glyphicon glyphicon-pencil",
+                            "data-toggle": "modal",
+                            "data-target": "#inventoryModal"
+                        })
+                            .click(function (e) {
+                                editRow(item.StockNumber);
+                            });
+
+
+                        return $("<div>").append($customEditButton);
+                        //return $result.add($customButton);
+                    }
+                }
+            ]
+        });
+
+        function editRow(stockNumber) {
+            $.ajax({
+                url: '/Home/EditRecord?stockNo=' + stockNumber, 
+                success: function(data) {
+                    $('#recordModalBody').html(data); 
+                }
+            });
+        }
+        function formatNumberForDisplay(numberToFormat) {
+             formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                digits: 2,
+              });
+
+              return formatter.format(numberToFormat);
+            }
+
+     
+
+
+
+    </script>
+}

@@ -1,0 +1,200 @@
+﻿@{
+    ViewBag.Title = "Inventory Management - Owner";
+    ViewBag.Markup = 0.05;
+}
+<h2>@ViewBag.Title</h2>
+<h3>@ViewBag.Message</h3>
+
+<div>
+    @Html.Label("Percent Markup:")
+    @Html.TextBox("txtMarkup", (decimal)ViewBag.Markup)
+    <a href="#markupModal" data-toggle="modal" data-target="#markupModal"><span class="glyphicon glyphicon-info-sign"></span></a>
+
+</div>
+<div>
+    @Html.Label("Show Sold-out Vehicles")
+    @Html.CheckBox("chkShowSold")
+    <a href="#soldoutModal" data-toggle="modal" data-target="#soldoutModal"><span class="glyphicon glyphicon-info-sign"></span></a>
+</div>
+
+<div id="markupModal" class="modal fade" role="dialog">
+    <div class="modal-dialog" >
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>The markup percent dynamically updates both the sales prices in the grid and the total sales/profits below. 
+                Given customer requirements, I could have this save to session and then database or config either onChange or with a button callback.</p>
+                <p>
+                    The users I've worked with in the past like to enter percent as a decimal, but it could also easily be formatted to accept whole numbers
+                    and apply conversions on the fly (eg: enter 5 and parse it into 0.05).
+                </p>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="soldoutModal" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>
+                   Given that the data includes quantity in stock, and that a dealership may wish to keep records of sold vehicles in the database,
+                    I've put in this toggle so that the user can see which vehicles have been sold out - either for re-ordering, auditing, or just general
+                    historic data. I've also included the Quantity In Stock column (not in the requirements) to make this distinction more clear, as well
+                    as to clarify why the sales prices aren't a straight total to the Profit/Sales summary.
+                </p>
+            </div>
+            <div class="modal-footer">
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="inventoryGrid"></div>
+@Html.Label("Total Selling Price")&nbsp;<span id="totalPrice"></span>
+<br />
+@Html.Label("Total Potential Profit") &nbsp;<span id="totalProfit"></span>
+@section scripts{
+    <link type="text/css" rel="stylesheet" href="~/Content/jsgrid.min.css" />
+    <link type="text/css" rel="stylesheet" href="~/Content/jsgrid-theme.min.css" />
+    <style type="text/css">
+        .row-sold-out{
+            background-color:darkgrey;
+            color: #770707;
+        }
+
+        .row-hide{
+            background-color:darkgrey;
+            color: #770707;
+            display:none;
+        }
+    </style>
+
+    <script type="text/javascript" src="~/Scripts/jsgrid.min.js"></script>
+    <script type="text/javascript">
+        $('#txtMarkup').change(function () {
+           $("#inventoryGrid").jsGrid("loadData");
+        });
+
+        $('#chkShowSold').change(function () {
+            $(".row-sold-out").toggleClass('row-hide');
+        })
+
+        $("#inventoryGrid").jsGrid({
+            autoload: true,
+            width: "100%",
+            sorting: true,
+            controller: {
+                loadData: function() {
+                    var d = $.Deferred();
+
+                   return $.ajax({
+                        type: "GET",
+                        url: '@Url.Action("GetInventory", "Home")',
+                        dataType: "json"
+                    });
+
+                }
+            },
+            rowClass: function (item, itemIndex) {
+                var showSoldout = $("#checkShowSold").prop('checked');
+                var quantity = item.QuantityInStock;
+                if (quantity == 0) {
+                    return showSoldout ? "row-sold-out" : "row-sold-out row-hide";
+                }
+
+                return "";
+            },
+            fields: [
+                { name: 'StockNumber', type: 'text', title: "Stock #", sorting: true },
+                {
+                    name: 'Make', type: 'text', title: "Make", sorting: true
+                },
+                { name: 'Model', type: 'text', title: "Model", sorting: true, sorter: "string" },
+                { name: 'Year', type: 'text', title: "Year", sorting: true },
+                { name: 'TypeText', type: 'text', title: "Type", sorting: true },
+                { name: 'FeaturesText', type: 'text', title: "Features", sorting: false },
+                {
+                    name: 'RetailPrice', type: 'number', title: "Sale Price",
+                    itemTemplate: function PriceFormatter(value, item) {
+
+                        var markup = $('#txtMarkup').val();
+                        return formatNumberForDisplay(value * (1 + parseFloat(markup)));
+                    }, sorting: true
+                },
+                {
+                    name: 'RetailPrice', visible: false
+                },
+                { name: 'QuantityInStock', type: 'number', title:'In Stock'},
+                {
+                    type: "control", width: 100, editButton: false, deleteButton: false,
+                    itemTemplate: function (value, item) {
+                        var $result = jsGrid.fields.control.prototype.itemTemplate.apply(this, arguments);
+
+                        if (item.QuantityInStock <= 0)
+                            return "";
+                        var $customEditButton = $("<button>").attr({
+                            class: "customGridEditbutton jsgrid-button glyphicon glyphicon-tag",
+                            title: "Sell this vehicle"
+                        })
+                            .click(function (e) {
+                                sellStock(item.StockNumber);
+                            });
+
+
+                        return $("<div>").append($customEditButton);
+                        //return $result.add($customButton);
+                    }
+                }
+            ],
+            onDataLoaded: function (args) {
+                //set totals
+                var rows = args.grid.data;
+                var markup = $('#txtMarkup').val();
+                var totalCost = 0;
+                for (row in rows) {
+                    thisRow = rows[row];
+                    totalCost += (thisRow.RetailPrice * thisRow.QuantityInStock);
+                }
+                var totalPrice = totalCost * (1 + parseFloat(markup));
+                var totalProfit = totalPrice - totalCost;
+                $('#totalPrice').html(formatNumberForDisplay(totalPrice));
+                $('#totalProfit').html(formatNumberForDisplay(totalProfit));
+            }
+        });
+
+
+        function formatNumberForDisplay(numberToFormat) {
+             formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                digits: 2,
+              });
+
+              return formatter.format(numberToFormat);
+        }
+
+        function sellStock(stockNumber) {
+            $.ajax({
+                url: '/Home/SellStock?stockNo=' + stockNumber, 
+                success: function(data) {
+                     $("#inventoryGrid").jsGrid("loadData");
+                }
+            });
+        }
+
+
+
+    </script>
+}
